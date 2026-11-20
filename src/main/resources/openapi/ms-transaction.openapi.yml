@@ -1,0 +1,299 @@
+openapi: 3.0.3
+info:
+  title: ms-transaction API
+  version: 1.0.0
+  description: |
+    Movement history of banking products. Write routes are internal (called by ms-acount and ms-credit).
+    
+    Conventions:
+    - Amounts are decimals with two fraction digits (`multipleOf: 0.01`) plus an ISO 4217 `currency`.
+      Generators must map them to BigDecimal, never to floating point.
+    - List endpoints can be consumed as `application/json` (array) or `application/x-ndjson` (reactive stream).
+    - Errors follow RFC 7807 (`application/problem+json`): 400 validation, 404 not found.
+    - Part I has no authentication (JWT is added in Part III).
+    
+    Database: MongoDB (reactive).
+servers:
+  - url: http://localhost:8084
+    description: ms-transaction (local)
+
+tags:
+  - name: Movements
+    description: ms-transaction
+
+paths:
+  /api/v1/movements:
+    get:
+      tags: [Movements]
+      operationId: findAllMovements
+      summary: List the movements of a banking product (cursor paginated)
+      description: |
+        Ordered by `createdAt` descending, then `id` descending. The next page cursor is returned in the
+        `X-Next-Cursor` header (absent on the last page). Combine `limit=10` with a `productId` to get the
+        latest 10 movements.
+      parameters:
+        - name: productId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: productType
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProductType'
+        - name: from
+          in: query
+          required: false
+          description: Inclusive lower bound (ISO-8601 instant)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Inclusive upper bound (ISO-8601 instant)
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor from the previous page (`X-Next-Cursor`)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Movements found
+          headers:
+            X-Next-Cursor:
+              description: Cursor for the next page; absent when there are no more results
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Movement'
+            application/x-ndjson:
+              schema:
+                $ref: '#/components/schemas/Movement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      tags: [Movements]
+      operationId: createMovement
+      summary: Register a movement
+      description: |
+        Internal: invoked by ms-acount and ms-credit to register a product movement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovementRequest'
+      responses:
+        '201':
+          description: Movement registered
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/movements/{movementId}:
+    parameters:
+      - $ref: '#/components/parameters/MovementId'
+    get:
+      tags: [Movements]
+      operationId: findMovementById
+      summary: Get a movement by id
+      responses:
+        '200':
+          description: Movement found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movement'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Movements]
+      operationId: updateMovement
+      summary: Update a movement (administrative)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovementUpdateRequest'
+      responses:
+        '200':
+          description: Movement updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Movements]
+      operationId: deleteMovement
+      summary: Delete a movement (administrative)
+      responses:
+        '204':
+          description: Movement deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    MovementId:
+      name: movementId
+      in: path
+      required: true
+      description: MongoDB document id
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Invalid request (validation errors)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: Movement registration is temporarily unavailable
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    ProductType:
+      type: string
+      enum: [BANK_ACCOUNT, CREDIT, CREDIT_CARD]
+    MovementType:
+      type: string
+      enum: [DEPOSIT, WITHDRAWAL, PAYMENT, CHARGE]
+    MovementRequest:
+      type: object
+      required: [productId, productType, movementType, amount]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        productType:
+          $ref: '#/components/schemas/ProductType'
+        movementType:
+          $ref: '#/components/schemas/MovementType'
+        amount:
+          $ref: '#/components/schemas/PositiveAmount'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        description:
+          type: string
+          maxLength: 200
+    MovementUpdateRequest:
+      type: object
+      required: [movementType, amount, currency]
+      properties:
+        movementType:
+          $ref: '#/components/schemas/MovementType'
+        amount:
+          $ref: '#/components/schemas/PositiveAmount'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        description:
+          type: string
+          maxLength: 200
+    Movement:
+      type: object
+      required: [id, productId, productType, movementType, amount, currency, createdAt]
+      properties:
+        id:
+          type: string
+          description: MongoDB document id
+        productId:
+          type: string
+          format: uuid
+        productType:
+          $ref: '#/components/schemas/ProductType'
+        movementType:
+          $ref: '#/components/schemas/MovementType'
+        amount:
+          $ref: '#/components/schemas/PositiveAmount'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Currency:
+      type: string
+      pattern: '^[A-Z]{3}$'
+      description: ISO 4217 currency code
+      default: PEN
+      example: PEN
+    PositiveAmount:
+      type: number
+      minimum: 0.01
+      multipleOf: 0.01
+      description: Strictly positive decimal amount with two fraction digits
+      example: 100.00
+    Problem:
+      type: object
+      description: RFC 7807 problem details
+      required: [status, title]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          example: about:blank
+        title:
+          type: string
+          example: Business rule violated
+        status:
+          type: integer
+          example: 422
+        detail:
+          type: string
+        instance:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        errors:
+          type: array
+          description: Field-level validation errors (400)
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string

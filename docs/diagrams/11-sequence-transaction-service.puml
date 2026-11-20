@@ -1,0 +1,60 @@
+@startuml 11-sequence-transaction-service
+title transaction-service - Diagrama de secuencia
+
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+actor "Cliente\n(Postman)" as User
+participant "account-service /\ncredit-service" as Caller
+participant "MovementController\n(inbound adapter)" as Controller
+participant "MovementCommandService\n/ MovementQueryService" as Service
+participant "MovementRepositoryPort\n+ MongoAdapter" as Repo
+database "MongoDB\nmovement_db" as DB
+
+== 1. Registrar movimiento (POST /api/v1/movements) - interno ==
+Caller -> Controller : POST /movements\n{productId, productType, movementType, amount, currency}
+Controller -> Service : register(command)
+Service -> Repo : save(movement)
+Repo -> DB : insert movement
+DB --> Repo : documento creado
+Repo --> Service : Movement
+Service --> Controller : RegisterMovementResult (interno)
+Controller --> Caller : 201 Created + Movement
+
+== 2. Consultar movimientos de un producto (GET /api/v1/movements) ==
+User -> Controller : GET /movements?productId={id}&productType=BANK_ACCOUNT\n&limit=50&cursor=...
+Controller -> Service : findAll(filter, cursorPageQuery)
+Service -> Repo : findAll(filter, cursorPageQuery)
+Repo -> DB : find({productId}) sort createdAt desc, id desc\nlimit N (cursor = createdAt + id)
+DB --> Repo : documentos
+Repo --> Service : Flowable<Movement>
+Service -> Service : arma MovementPage\n(pide limit+1 para calcular nextCursor)
+Service --> Controller : Single<MovementPage>
+Controller --> User : 200 OK + cabecera X-Next-Cursor\n(application/json o application/x-ndjson)
+
+== 3. Administrar movimientos (PUT / DELETE /api/v1/movements/{id}) - interno ==
+User -> Controller : PUT o DELETE /movements/{id}
+Controller -> Service : update(id, command) / delete(id)
+Service -> Repo : findById(id)
+Repo -> DB : find({_id})
+DB --> Repo : documento o vacio
+Repo --> Service : Maybe<Movement>
+alt no existe
+  Service --> Controller : ResourceNotFoundException
+  Controller --> User : 404 Not Found
+else existe
+  Service -> Repo : save(movement) / deleteById(id)
+  Repo -> DB : replace / delete
+  DB --> Repo : OK
+  Service --> Controller : Single<Movement> / Completable
+  Controller --> User : 200 OK / 204 No Content
+end
+
+note over User, DB
+  RegisterMovementResult es interno al caso de uso.
+  El controlador devuelve su campo Movement, no el envoltorio.
+  Las rutas de escritura son internas/administrativas.
+  El contador mensual de movimientos vive en account-service.
+end note
+
+@enduml

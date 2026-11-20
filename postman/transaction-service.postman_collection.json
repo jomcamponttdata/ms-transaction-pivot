@@ -1,0 +1,207 @@
+{
+  "info": {
+    "name": "transaction-service",
+    "description": "Movements and history collection for transaction-service (Parte I)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "transaction-service-0000-0000-0000-000000000001"
+  },
+  "item": [
+    {
+      "name": "POST createMovement",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"productType\": \"BANK_ACCOUNT\",\n  \"movementType\": \"DEPOSIT\",\n  \"amount\": 25.50,\n  \"currency\": \"PEN\",\n  \"description\": \"Cash deposit\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements"]
+        },
+        "description": "Registers a new movement for a banking product"
+      },
+      "response": []
+    },
+    {
+      "name": "GET findMovementById",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements", "{{movementId}}"]
+        },
+        "description": "Retrieves a movement by its MongoDB document id"
+      },
+      "response": []
+    },
+    {
+      "name": "GET findAllMovements",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements"],
+          "query": [
+            {
+              "key": "productId",
+              "value": "{{productId}}"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "description": "Lists movements for a product with cursor pagination"
+      },
+      "response": []
+    },
+    {
+      "name": "GET findAllMovements with cursor",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&limit=10&cursor={{nextCursor}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements"],
+          "query": [
+            {
+              "key": "productId",
+              "value": "{{productId}}"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            },
+            {
+              "key": "cursor",
+              "value": "{{nextCursor}}"
+            }
+          ]
+        },
+        "description": "Lists movements page using X-Next-Cursor header"
+      },
+      "response": []
+    },
+    {
+      "name": "PUT updateMovement",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"movementType\": \"PAYMENT\",\n  \"amount\": 10.00,\n  \"currency\": \"USD\",\n  \"description\": \"Updated payment\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements", "{{movementId}}"]
+        },
+        "description": "Updates editable fields of an existing movement"
+      },
+      "response": []
+    },
+    {
+      "name": "DELETE deleteMovement",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements", "{{movementId}}"]
+        },
+        "description": "Deletes an existing movement"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8084",
+      "type": "string"
+    },
+    {
+      "key": "correlationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "movementId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "nextCursor",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

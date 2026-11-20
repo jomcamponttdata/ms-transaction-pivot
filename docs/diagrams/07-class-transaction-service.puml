@@ -1,0 +1,136 @@
+@startuml 07-class-transaction-service
+title transaction-service - Diagrama de clases (hexagonal)
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+hide empty members
+
+' Nucleo: RxJava 3 | Infraestructura: Reactor (conversion en los adaptadores)
+
+package "domain" <<Rectangle>> {
+  class Movement {
+    -id : String
+    -productId : UUID
+    -productType : ProductType
+    -movementType : MovementType
+    -amount : Money
+    -description : String
+    -createdAt : Instant
+  }
+  class Money <<value object>> {
+    -amount : BigDecimal
+    -currency : String
+  }
+  enum ProductType {
+    BANK_ACCOUNT
+    CREDIT
+    CREDIT_CARD
+  }
+  enum MovementType {
+    DEPOSIT
+    WITHDRAWAL
+    PAYMENT
+    CHARGE
+  }
+  class ResourceNotFoundException
+}
+
+package "application.port.in" <<Rectangle>> {
+  interface RegisterMovementUseCase {
+    +register(RegisterMovementCommand) : Single<RegisterMovementResult>
+  }
+  interface GetMovementsUseCase {
+    +findAll(MovementFilter, CursorPageQuery) : Single<MovementPage>
+    +findById(String) : Single<Movement>
+  }
+  interface UpdateMovementUseCase {
+    +update(String, UpdateMovementCommand) : Single<Movement>
+  }
+  interface DeleteMovementUseCase {
+    +delete(String) : Completable
+  }
+  class RegisterMovementCommand <<record>>
+  class UpdateMovementCommand <<record>>
+  class MovementFilter <<record>> {
+    productId, productType, from, to
+  }
+  class CursorPageQuery <<record>> {
+    limit : int (default 50, max 200)
+    cursor : String
+  }
+  class MovementPage <<record>> {
+    items : List<Movement>
+    nextCursor : String
+  }
+  class RegisterMovementResult <<record>> {
+    movement : Movement
+    created : boolean
+  }
+}
+
+package "application.port.out" <<Rectangle>> {
+  interface MovementRepositoryPort {
+    +save(Movement) : Single<Movement>
+    +findById(String) : Maybe<Movement>
+    +findAll(MovementFilter, CursorPageQuery) : Flowable<Movement>
+    +deleteById(String) : Completable
+  }
+}
+
+package "application.service" <<Rectangle>> {
+  class MovementCommandService
+  class MovementQueryService
+}
+
+package "infrastructure.adapter.in" <<Rectangle>> {
+  class MovementController <<inbound adapter>> {
+    rutas internas / administrativas
+  }
+  class MovementRestMapper
+  class GlobalExceptionHandler {
+    mapea errores a RFC 7807
+  }
+}
+
+package "infrastructure.adapter.out" <<Rectangle>> {
+  class MongoMovementRepositoryAdapter <<outbound adapter>>
+  interface MovementMongoRepository <<Spring Data Reactive Mongo>>
+  class MovementDocument {
+    indice: productId + createdAt desc
+  }
+}
+
+RegisterMovementUseCase <|.. MovementCommandService
+UpdateMovementUseCase <|.. MovementCommandService
+DeleteMovementUseCase <|.. MovementCommandService
+GetMovementsUseCase <|.. MovementQueryService
+
+MovementCommandService ..> MovementRepositoryPort
+MovementQueryService ..> MovementRepositoryPort
+MovementQueryService ..> ResourceNotFoundException
+
+MovementRepositoryPort <|.. MongoMovementRepositoryAdapter
+MongoMovementRepositoryAdapter ..> MovementMongoRepository
+MongoMovementRepositoryAdapter ..> MovementDocument
+
+MovementController ..> RegisterMovementUseCase
+MovementController ..> GetMovementsUseCase
+MovementController ..> UpdateMovementUseCase
+MovementController ..> DeleteMovementUseCase
+MovementController ..> MovementRestMapper
+
+Movement --> ProductType
+Movement --> MovementType
+Movement *-- Money
+
+note bottom of MovementCommandService
+  RegisterMovementResult es un tipo interno del caso de uso.
+  MovementController extrae su campo movement y responde
+  al cliente con el recurso Movement (201 Created).
+  findAll(): MovementPage lleva nextCursor, que el
+  controlador expone en la cabecera X-Next-Cursor.
+  update/delete son administrativos y quedan marcados
+  como internos (alternativa: reversas auditables).
+end note
+
+@enduml

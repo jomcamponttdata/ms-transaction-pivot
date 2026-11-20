@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: transaction-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  data:
+    mongodb:
+      uri: ${TRANSACTION_MONGODB_URI:mongodb://localhost:27017/movement_db}
+server:
+  port: ${TRANSACTION_SERVICE_PORT:8084}
+logging:
+  level:
+    com.pivot.banking.transaction: INFO
