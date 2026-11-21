@@ -185,6 +185,16 @@
                         </configuration>
                     </execution>
                 </executions>
+                <configuration>
+                    <excludes>
+                        <exclude>com/pivot/banking/transaction/adapter/**</exclude>
+                        <exclude>com/pivot/banking/transaction/TransactionServiceApplication.class</exclude>
+                        <exclude>com/pivot/banking/transaction/application/exception/**</exclude>
+                        <exclude>com/pivot/banking/transaction/domain/**</exclude>
+                        <exclude>com/pivot/banking/transaction/infrastructure/adapter/in/MovementExceptionHandler.class</exclude>
+                        <exclude>com/pivot/banking/transaction/infrastructure/adapter/in/MovementRestMapper.class</exclude>
+                    </excludes>
+                </configuration>
             </plugin>
         </plugins>
     </build>

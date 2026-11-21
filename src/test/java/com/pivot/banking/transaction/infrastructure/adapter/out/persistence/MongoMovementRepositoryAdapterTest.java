@@ -5,9 +5,9 @@ import com.pivot.banking.transaction.domain.MovementCursor;
 import com.pivot.banking.transaction.domain.MovementFilter;
 import com.pivot.banking.transaction.domain.MovementType;
 import com.pivot.banking.transaction.domain.ProductType;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
@@ -22,7 +22,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,110 +33,114 @@ class MongoMovementRepositoryAdapterTest {
     private SpringDataMovementRepository repository;
     @Mock
     private ReactiveMongoTemplate template;
-
+    @InjectMocks
     private MongoMovementRepositoryAdapter adapter;
-
-    @BeforeEach
-    void setUp() {
-        adapter = new MongoMovementRepositoryAdapter(repository, template);
-    }
 
     @Test
     void savePersistsAndReturnsMovement() {
         // Arrange
-        var movement = movement("id-1");
-        when(repository.save(any(MovementEntity.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        Movement movement = movement("id-1");
+        when(repository.save(any(MovementEntity.class)))
+                .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
 
         // Act
-        var result = adapter.save(movement);
+        Mono<Movement> result = adapter.save(movement);
 
         // Assert
         StepVerifier.create(result)
                 .assertNext(saved -> {
                     assertEquals("id-1", saved.id());
-                    assertEquals(movement productId(), saved productId());
+                    assertEquals(movement.productId(), saved.productId());
                     assertEquals(movement.productType(), saved.productType());
                     assertEquals(movement.movementType(), saved.movementType());
                     assertEquals(movement.amount(), saved.amount());
                     assertEquals(movement.currency(), saved.currency());
+                    assertEquals(movement.description(), saved.description());
                     assertEquals(movement.createdAt(), saved.createdAt());
                 })
                 .verifyComplete();
+        verify(repository).save(any(MovementEntity.class));
     }
 
     @Test
     void findByIdReturnsMovementWhenExists() {
         // Arrange
-        var movement = movement("id-1");
+        Movement movement = movement("id-1");
         when(repository.findById("id-1")).thenReturn(Mono.just(MovementEntity.fromDomain(movement)));
 
         // Act
-        var result = adapter.findById("id-1");
+        Mono<Movement> result = adapter.findById("id-1");
 
         // Assert
         StepVerifier.create(result)
-                .assertNext(found -> assertEquals("id-1", found.id()))
+                .assertNext(found -> assertEquals(movement, found))
                 .verifyComplete();
+        verify(repository).findById("id-1");
     }
 
     @Test
-    void findByIdReturnsEmptyWhenNotExists() {
+    void findByIdReturnsEmptyWhenMovementDoesNotExist() {
         // Arrange
         when(repository.findById("missing")).thenReturn(Mono.empty());
 
         // Act
-        var result = adapter.findById("missing");
+        Mono<Movement> result = adapter.findById("missing");
 
         // Assert
         StepVerifier.create(result).verifyComplete();
+        verify(repository).findById("missing");
     }
 
     @Test
-    void findPageWithFiltersAndCursor() {
+    void findPageAppliesEveryFilterAndCursor() {
         // Arrange
-        var movement = movement("id-1");
-        var filter = new MovementFilter(UUID.randomUUID(), ProductType.BANK_ACCOUNT,
+        Movement movement = movement("id-1");
+        MovementEntity entity = MovementEntity.fromDomain(movement);
+        UUID productId = movement.productId();
+        MovementFilter filter = new MovementFilter(productId, ProductType.BANK_ACCOUNT,
                 Instant.parse("2025-01-01T00:00:00Z"), Instant.parse("2025-12-31T00:00:00Z"));
-        var cursor = new MovementCursor(Instant.parse("2025-01-01T00:00:00Z"), "cursor-id");
-        when(template.find(any(Query.class), any(Class.class))).thenReturn(Flux.just(MovementEntity.fromDomain(movement)));
+        MovementCursor cursor = new MovementCursor(Instant.parse("2025-01-02T00:00:00Z"), "cursor-id");
+        when(template.find(any(Query.class), eq(MovementEntity.class))).thenReturn(Flux.just(entity));
 
         // Act
-        var result = adapter.findPage(filter, cursor, 10);
+        Flux<Movement> result = adapter.findPage(filter, cursor, 10);
 
         // Assert
         StepVerifier.create(result)
-                .assertNext(found -> assertEquals("id-1", found.id()))
+                .assertNext(found -> assertEquals(movement, found))
                 .verifyComplete();
-        verify(template).find(any(Query.class), any(Class.class));
+        verify(template).find(any(Query.class), eq(MovementEntity.class));
+    }
+
+    @Test
+    void findPageSupportsEmptyFiltersAndNoCursor() {
+        // Arrange
+        MovementFilter filter = new MovementFilter(null, null, null, null);
+        when(template.find(any(Query.class), eq(MovementEntity.class))).thenReturn(Flux.empty());
+
+        // Act
+        Flux<Movement> result = adapter.findPage(filter, null, 20);
+
+        // Assert
+        StepVerifier.create(result).verifyComplete();
+        verify(template).find(any(Query.class), eq(MovementEntity.class));
     }
 
     @Test
     void deleteByIdDeletesMovement() {
         // Arrange
-        when(repository.findById("id-1")).thenReturn(Mono.just(MovementEntity.fromDomain(movement("id-1"))));
-        when(repository.delete(any(MovementEntity.class))).thenReturn(Mono.empty());
+        when(repository.deleteById("id-1")).thenReturn(Mono.empty());
 
         // Act
-        var result = adapter.findById("id-1").flatMap(m -> adapter.deleteById("id-1"));
+        Mono<Void> result = adapter.deleteById("id-1");
 
         // Assert
         StepVerifier.create(result).verifyComplete();
-    }
-
-    @Test
-    void deleteByIdReturnsNotFoundWhenMovementDoesNotExist() {
-        // Arrange
-        when(repository.findById("missing")).thenReturn(Mono.empty());
-
-        // Act
-        var result = adapter.findById("missing").flatMap(m -> adapter.deleteById("missing"));
-
-        // Assert
-        StepVerifier.create(result).verifyComplete();
+        verify(repository).deleteById("id-1");
     }
 
     private Movement movement(String id) {
         return new Movement(id, UUID.randomUUID(), ProductType.BANK_ACCOUNT, MovementType.DEPOSIT,
-                new BigDecimal("1.00"), "PEN", null, Instant.now());
+                new BigDecimal("1.00"), "PEN", "Cash deposit", Instant.parse("2025-01-01T00:00:00Z"));
     }
 }

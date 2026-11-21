@@ -1,207 +1,559 @@
 {
   "info": {
-    "name": "transaction-service",
-    "description": "Movements and history collection for transaction-service (Parte I)",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_postman_id": "transaction-service-0000-0000-0000-000000000001"
+    "_postman_id": "51f73cbb-5a44-4ee3-8d8c-ebdc4d4242b4",
+    "name": "transaction-service - Part I",
+    "description": "Executable CRUD, cursor pagination, validation and error tests for transaction-service. Run the requests in order with a running MongoDB instance and transaction-service on port 8084.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [
+          "pm.collectionVariables.set('correlationId', pm.variables.replaceIn('{{$guid}}'));",
+          "if (!pm.collectionVariables.get('productId')) {",
+          "    pm.collectionVariables.set('productId', pm.variables.replaceIn('{{$guid}}'));",
+          "}"
+        ]
+      }
+    }
+  ],
   "item": [
     {
-      "name": "POST createMovement",
+      "name": "01 - Create movement",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('Created movement matches the contract', () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.id).to.be.a('string').and.not.empty;",
+              "    pm.expect(body.productId).to.equal(pm.collectionVariables.get('productId'));",
+              "    pm.expect(body.productType).to.equal('BANK_ACCOUNT');",
+              "    pm.expect(body.movementType).to.equal('DEPOSIT');",
+              "    pm.expect(body.amount).to.equal(25.5);",
+              "    pm.expect(body.currency).to.equal('PEN');",
+              "    pm.expect(body.description).to.equal('Cash deposit');",
+              "    pm.expect(body.createdAt).to.be.a('string').and.not.empty;",
+              "    pm.expect(pm.response.headers.get('Location')).to.equal('/api/v1/movements/' + body.id);",
+              "    pm.collectionVariables.set('movementId', body.id);",
+              "});"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "POST",
         "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "X-Correlation-ID",
-            "value": "{{correlationId}}"
-          }
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"productType\": \"BANK_ACCOUNT\",\n  \"movementType\": \"DEPOSIT\",\n  \"amount\": 25.50,\n  \"currency\": \"PEN\",\n  \"description\": \"Cash deposit\"\n}"
+          "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"productType\": \"BANK_ACCOUNT\",\n  \"movementType\": \"DEPOSIT\",\n  \"amount\": 25.50,\n  \"currency\": \"PEN\",\n  \"description\": \"Cash deposit\"\n}",
+          "options": { "raw": { "language": "json" } }
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements",
           "host": ["{{baseUrl}}"],
           "path": ["api", "v1", "movements"]
-        },
-        "description": "Registers a new movement for a banking product"
+        }
       },
       "response": []
     },
     {
-      "name": "GET findMovementById",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "X-Correlation-ID",
-            "value": "{{correlationId}}"
+      "name": "02 - Create second movement with default currency",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('Omitted currency defaults to PEN', () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.currency).to.equal('PEN');",
+              "    pm.expect(body.amount).to.equal(40);",
+              "    pm.collectionVariables.set('secondMovementId', body.id);",
+              "});"
+            ]
           }
-        ],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements", "{{movementId}}"]
-        },
-        "description": "Retrieves a movement by its MongoDB document id"
-      },
-      "response": []
-    },
-    {
-      "name": "GET findAllMovements",
+        }
+      ],
       "request": {
-        "method": "GET",
+        "method": "POST",
         "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "X-Correlation-ID",
-            "value": "{{correlationId}}"
-          }
-        ],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&limit=20",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"],
-          "query": [
-            {
-              "key": "productId",
-              "value": "{{productId}}"
-            },
-            {
-              "key": "limit",
-              "value": "20"
-            }
-          ]
-        },
-        "description": "Lists movements for a product with cursor pagination"
-      },
-      "response": []
-    },
-    {
-      "name": "GET findAllMovements with cursor",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "X-Correlation-ID",
-            "value": "{{correlationId}}"
-          }
-        ],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&limit=10&cursor={{nextCursor}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"],
-          "query": [
-            {
-              "key": "productId",
-              "value": "{{productId}}"
-            },
-            {
-              "key": "limit",
-              "value": "10"
-            },
-            {
-              "key": "cursor",
-              "value": "{{nextCursor}}"
-            }
-          ]
-        },
-        "description": "Lists movements page using X-Next-Cursor header"
-      },
-      "response": []
-    },
-    {
-      "name": "PUT updateMovement",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "X-Correlation-ID",
-            "value": "{{correlationId}}"
-          }
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"movementType\": \"PAYMENT\",\n  \"amount\": 10.00,\n  \"currency\": \"USD\",\n  \"description\": \"Updated payment\"\n}"
+          "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"productType\": \"BANK_ACCOUNT\",\n  \"movementType\": \"DEPOSIT\",\n  \"amount\": 40.00,\n  \"description\": \"Second deposit\"\n}",
+          "options": { "raw": { "language": "json" } }
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
+          "raw": "{{baseUrl}}/api/v1/movements",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements", "{{movementId}}"]
-        },
-        "description": "Updates editable fields of an existing movement"
+          "path": ["api", "v1", "movements"]
+        }
       },
       "response": []
     },
     {
-      "name": "DELETE deleteMovement",
-      "request": {
-        "method": "DELETE",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "X-Correlation-ID",
-            "value": "{{correlationId}}"
+      "name": "03 - Find movement by ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('The requested movement is returned', () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.id).to.equal(pm.collectionVariables.get('movementId'));",
+              "    pm.expect(body.productId).to.equal(pm.collectionVariables.get('productId'));",
+              "});"
+            ]
           }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
           "host": ["{{baseUrl}}"],
           "path": ["api", "v1", "movements", "{{movementId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "04 - Find movements by product",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Both product movements are returned', () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.be.an('array').with.lengthOf(2);",
+              "    body.forEach(movement => pm.expect(movement.productId).to.equal(pm.collectionVariables.get('productId')));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&productType=BANK_ACCOUNT&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements"],
+          "query": [
+            { "key": "productId", "value": "{{productId}}" },
+            { "key": "productType", "value": "BANK_ACCOUNT" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "05 - Find first cursor page",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Page has one result and a continuation cursor', () => {",
+              "    const body = pm.response.json();",
+              "    const cursor = pm.response.headers.get('X-Next-Cursor');",
+              "    pm.expect(body).to.be.an('array').with.lengthOf(1);",
+              "    pm.expect(cursor).to.be.a('string').and.not.empty;",
+              "    pm.collectionVariables.set('nextCursor', cursor);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&limit=1",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements"],
+          "query": [
+            { "key": "productId", "value": "{{productId}}" },
+            { "key": "limit", "value": "1" }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "06 - Find next cursor page",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Last page has one result and no continuation cursor', () => {",
+              "    pm.expect(pm.response.json()).to.be.an('array').with.lengthOf(1);",
+              "    pm.expect(pm.response.headers.get('X-Next-Cursor')).to.be.undefined;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&limit=1&cursor={{nextCursor}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements"],
+          "query": [
+            { "key": "productId", "value": "{{productId}}" },
+            { "key": "limit", "value": "1" },
+            { "key": "cursor", "value": "{{nextCursor}}" }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "07 - Update movement",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Editable fields are replaced', () => {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.id).to.equal(pm.collectionVariables.get('movementId'));",
+              "    pm.expect(body.movementType).to.equal('PAYMENT');",
+              "    pm.expect(body.amount).to.equal(10);",
+              "    pm.expect(body.currency).to.equal('USD');",
+              "    pm.expect(body.description).to.equal('Updated payment');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"movementType\": \"PAYMENT\",\n  \"amount\": 10.00,\n  \"currency\": \"USD\",\n  \"description\": \"Updated payment\"\n}",
+          "options": { "raw": { "language": "json" } }
         },
-        "description": "Deletes an existing movement"
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements", "{{movementId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "08 - Reject non-positive amount",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 400 Bad Request', () => pm.response.to.have.status(400));",
+              "pm.test('Error uses RFC 7807', () => {",
+              "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+              "    pm.expect(pm.response.json().title).to.equal('Invalid request');",
+              "    pm.expect(pm.response.json().status).to.equal(400);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"productType\": \"BANK_ACCOUNT\",\n  \"movementType\": \"DEPOSIT\",\n  \"amount\": 0,\n  \"currency\": \"PEN\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "09 - Reject invalid limit",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 400 Bad Request', () => pm.response.to.have.status(400));",
+              "pm.test('Invalid request problem is returned', () => {",
+              "    pm.expect(pm.response.json().title).to.equal('Invalid request');",
+              "    pm.expect(pm.response.json().status).to.equal(400);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements?limit=0",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements"],
+          "query": [{ "key": "limit", "value": "0" }]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "10 - Reject invalid cursor",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 400 Bad Request', () => pm.response.to.have.status(400));",
+              "pm.test('Invalid cursor problem is returned', () => {",
+              "    pm.expect(pm.response.json().title).to.equal('Invalid request');",
+              "    pm.expect(pm.response.json().status).to.equal(400);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements?limit=10&cursor=bad-cursor",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements"],
+          "query": [
+            { "key": "limit", "value": "10" },
+            { "key": "cursor", "value": "bad-cursor" }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "11 - Reject inverted date range",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 400 Bad Request', () => pm.response.to.have.status(400));",
+              "pm.test('Invalid range problem is returned', () => {",
+              "    pm.expect(pm.response.json().title).to.equal('Invalid request');",
+              "    pm.expect(pm.response.json().status).to.equal(400);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements?from=2025-02-01T00:00:00Z&to=2025-01-01T00:00:00Z",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements"],
+          "query": [
+            { "key": "from", "value": "2025-02-01T00:00:00Z" },
+            { "key": "to", "value": "2025-01-01T00:00:00Z" }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "12 - Delete first movement",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements", "{{movementId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "13 - Find deleted movement returns 404",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 404 Not Found', () => pm.response.to.have.status(404));",
+              "pm.test('Not-found problem is returned', () => {",
+              "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+              "    pm.expect(pm.response.json().title).to.equal('Movement not found');",
+              "    pm.expect(pm.response.json().status).to.equal(404);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements", "{{movementId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "14 - Delete second movement",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements/{{secondMovementId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements", "{{secondMovementId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "15 - Delete missing movement returns 404",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "exec": [
+              "pm.test('Status is 404 Not Found', () => pm.response.to.have.status(404));",
+              "pm.test('Not-found problem is returned', () => {",
+              "    pm.expect(pm.response.json().title).to.equal('Movement not found');",
+              "    pm.expect(pm.response.json().status).to.equal(404);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "movements", "{{movementId}}"]
+        }
       },
       "response": []
     }
   ],
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:8084",
-      "type": "string"
-    },
-    {
-      "key": "correlationId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "productId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "movementId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "nextCursor",
-      "value": "",
-      "type": "string"
-    }
+    { "key": "baseUrl", "value": "http://localhost:8084", "type": "string" },
+    { "key": "correlationId", "value": "", "type": "string" },
+    { "key": "productId", "value": "", "type": "string" },
+    { "key": "movementId", "value": "", "type": "string" },
+    { "key": "secondMovementId", "value": "", "type": "string" },
+    { "key": "nextCursor", "value": "", "type": "string" }
   ]
 }
