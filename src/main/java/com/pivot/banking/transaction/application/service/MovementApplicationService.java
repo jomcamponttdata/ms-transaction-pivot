@@ -12,8 +12,9 @@ import com.pivot.banking.transaction.domain.Movement;
 import com.pivot.banking.transaction.domain.MovementCursor;
 import com.pivot.banking.transaction.domain.MovementFilter;
 import com.pivot.banking.transaction.domain.MovementPage;
+import io.reactivex.rxjava3.core.Completable;
+import io.reactivex.rxjava3.core.Single;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
@@ -34,7 +35,7 @@ public class MovementApplicationService implements CreateMovement, GetMovements,
 
     /** Creates a movement using the default currency when the caller omits it. */
     @Override
-    public Mono<Movement> create(CreateMovementCommand command) {
+    public Single<Movement> create(CreateMovementCommand command) {
         var movement = new Movement(UUID.randomUUID().toString(), command.productId(), command.productType(),
                 command.movementType(), command.amount(),
                 command.currency() == null ? "PEN" : command.currency(), command.description(), Instant.now());
@@ -43,22 +44,22 @@ public class MovementApplicationService implements CreateMovement, GetMovements,
 
     /** Queries movement history and creates a cursor only when another page exists. */
     @Override
-    public Mono<MovementPage> findAll(MovementFilter filter, int limit, String cursorToken) {
+    public Single<MovementPage> findAll(MovementFilter filter, int limit, String cursorToken) {
         if (limit < 1 || limit > 200) {
-            return Mono.error(new IllegalArgumentException("limit must be between 1 and 200"));
+            return Single.error(new IllegalArgumentException("limit must be between 1 and 200"));
         }
         if (filter.from() != null && filter.to() != null && filter.from().isAfter(filter.to())) {
-            return Mono.error(new IllegalArgumentException("'from' must not be after 'to'"));
+            return Single.error(new IllegalArgumentException("'from' must not be after 'to'"));
         }
 
         MovementCursor cursor;
         try {
             cursor = decodeCursor(cursorToken);
         } catch (IllegalArgumentException exception) {
-            return Mono.error(exception);
+            return Single.error(exception);
         }
         return repository.findPage(filter, cursor, limit + 1)
-                .collectList()
+                .toList()
                 .map(found -> {
                     boolean hasNext = found.size() > limit;
                     var pageMovements = hasNext ? found.subList(0, limit) : found;
@@ -69,14 +70,14 @@ public class MovementApplicationService implements CreateMovement, GetMovements,
 
     /** Retrieves a movement or raises a not-found error. */
     @Override
-    public Mono<Movement> findById(String movementId) {
+    public Single<Movement> findById(String movementId) {
         return repository.findById(movementId)
-                .switchIfEmpty(Mono.error(new MovementNotFoundException(movementId)));
+                .switchIfEmpty(Single.error(new MovementNotFoundException(movementId)));
     }
 
     /** Updates an existing movement while retaining its product identity and creation time. */
     @Override
-    public Mono<Movement> update(String movementId, UpdateMovementCommand command) {
+    public Single<Movement> update(String movementId, UpdateMovementCommand command) {
         return findById(movementId)
                 .map(movement -> movement.update(command.movementType(), command.amount(), command.currency(),
                         command.description()))
@@ -85,8 +86,8 @@ public class MovementApplicationService implements CreateMovement, GetMovements,
 
     /** Deletes an existing movement. */
     @Override
-    public Mono<Void> delete(String movementId) {
-        return findById(movementId).flatMap(movement -> repository.deleteById(movementId));
+    public Completable delete(String movementId) {
+        return findById(movementId).flatMapCompletable(movement -> repository.deleteById(movementId));
     }
 
     /** Encodes the last returned movement position as an opaque URL-safe token. */

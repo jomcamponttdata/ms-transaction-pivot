@@ -9,8 +9,13 @@ import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
+import reactor.adapter.rxjava.RxJava3Adapter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import io.reactivex.rxjava3.core.Completable;
+import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.core.Maybe;
+import io.reactivex.rxjava3.core.Single;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,19 +35,21 @@ public class MongoMovementRepositoryAdapter implements MovementRepositoryPort {
 
     /** Saves a movement document. */
     @Override
-    public Mono<Movement> save(Movement movement) {
-        return repository.save(MovementEntity.fromDomain(movement)).map(MovementEntity::toDomain);
+    public Single<Movement> save(Movement movement) {
+        Mono<Movement> result = repository.save(MovementEntity.fromDomain(movement)).map(MovementEntity::toDomain);
+        return RxJava3Adapter.monoToSingle(result);
     }
 
     /** Finds a movement document by its identifier. */
     @Override
-    public Mono<Movement> findById(String movementId) {
-        return repository.findById(movementId).map(MovementEntity::toDomain);
+    public Maybe<Movement> findById(String movementId) {
+        Mono<Movement> result = repository.findById(movementId).map(MovementEntity::toDomain);
+        return RxJava3Adapter.monoToMaybe(result);
     }
 
     /** Finds movements matching filters and the descending cursor position. */
     @Override
-    public Flux<Movement> findPage(MovementFilter filter, MovementCursor cursor, int limit) {
+    public Flowable<Movement> findPage(MovementFilter filter, MovementCursor cursor, int limit) {
         List<Criteria> filters = new ArrayList<>();
         if (filter.productId() != null) {
             filters.add(Criteria.where("productId").is(filter.productId()));
@@ -70,12 +77,14 @@ public class MongoMovementRepositoryAdapter implements MovementRepositoryPort {
         Query query = Query.query(criteria)
                 .with(Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("_id")))
                 .limit(limit);
-        return template.find(query, MovementEntity.class).map(MovementEntity::toDomain);
+        Flux<Movement> result = template.find(query, MovementEntity.class).map(MovementEntity::toDomain);
+        return RxJava3Adapter.fluxToFlowable(result);
     }
 
     /** Deletes a movement document by identifier. */
     @Override
-    public Mono<Void> deleteById(String movementId) {
-        return repository.deleteById(movementId);
+    public Completable deleteById(String movementId) {
+        Mono<Void> result = repository.deleteById(movementId);
+        return RxJava3Adapter.monoToCompletable(result);
     }
 }

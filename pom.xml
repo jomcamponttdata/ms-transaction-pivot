@@ -12,7 +12,7 @@
     </parent>
 
     <groupId>com.pivot.banking</groupId>
-    <artifactId>transaction</artifactId>
+    <artifactId>ms-transaction</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>transaction-service</name>
     <description>Banking product movements and history microservice</description>
@@ -61,6 +61,16 @@
             <artifactId>spring-boot-starter-data-mongodb-reactive</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.reactivex.rxjava3</groupId>
+            <artifactId>rxjava</artifactId>
+            <version>${rxjava.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor.addons</groupId>
+            <artifactId>reactor-adapter</artifactId>
+            <version>${reactor-adapter.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
@@ -74,16 +84,6 @@
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-test</artifactId>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.reactivex.rxjava3</groupId>
-            <artifactId>rxjava</artifactId>
-            <version>${rxjava.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.projectreactor.addons</groupId>
-            <artifactId>reactor-adapter</artifactId>
-            <version>${reactor-adapter.version}</version>
         </dependency>
     </dependencies>
 
@@ -189,10 +189,6 @@
                     <excludes>
                         <exclude>com/pivot/banking/transaction/adapter/**</exclude>
                         <exclude>com/pivot/banking/transaction/TransactionServiceApplication.class</exclude>
-                        <exclude>com/pivot/banking/transaction/application/exception/**</exclude>
-                        <exclude>com/pivot/banking/transaction/domain/**</exclude>
-                        <exclude>com/pivot/banking/transaction/infrastructure/adapter/in/MovementExceptionHandler.class</exclude>
-                        <exclude>com/pivot/banking/transaction/infrastructure/adapter/in/MovementRestMapper.class</exclude>
                     </excludes>
                 </configuration>
             </plugin>

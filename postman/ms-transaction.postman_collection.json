@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "51f73cbb-5a44-4ee3-8d8c-ebdc4d4242b4",
-    "name": "transaction-service - Part I",
+    "name": "ms-transaction - Part I",
     "description": "Executable CRUD, cursor pagination, validation and error tests for transaction-service. Run the requests in order with a running MongoDB instance and transaction-service on port 8084.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -13,7 +13,7 @@
         "packages": {},
         "exec": [
           "pm.collectionVariables.set('correlationId', pm.variables.replaceIn('{{$guid}}'));",
-          "if (!pm.collectionVariables.get('productId')) {",
+          "if (!pm.variables.get('productId')) {",
           "    pm.collectionVariables.set('productId', pm.variables.replaceIn('{{$guid}}'));",
           "}"
         ]
@@ -34,7 +34,7 @@
               "pm.test('Created movement matches the contract', () => {",
               "    const body = pm.response.json();",
               "    pm.expect(body.id).to.be.a('string').and.not.empty;",
-              "    pm.expect(body.productId).to.equal(pm.collectionVariables.get('productId'));",
+              "    pm.expect(body.productId).to.equal(pm.variables.get('productId'));",
               "    pm.expect(body.productType).to.equal('BANK_ACCOUNT');",
               "    pm.expect(body.movementType).to.equal('DEPOSIT');",
               "    pm.expect(body.amount).to.equal(25.5);",
@@ -51,18 +51,34 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"productType\": \"BANK_ACCOUNT\",\n  \"movementType\": \"DEPOSIT\",\n  \"amount\": 25.50,\n  \"currency\": \"PEN\",\n  \"description\": \"Cash deposit\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements"
+          ]
         }
       },
       "response": []
@@ -90,18 +106,34 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"productType\": \"BANK_ACCOUNT\",\n  \"movementType\": \"DEPOSIT\",\n  \"amount\": 40.00,\n  \"description\": \"Second deposit\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements"
+          ]
         }
       },
       "response": []
@@ -119,7 +151,7 @@
               "pm.test('The requested movement is returned', () => {",
               "    const body = pm.response.json();",
               "    pm.expect(body.id).to.equal(pm.collectionVariables.get('movementId'));",
-              "    pm.expect(body.productId).to.equal(pm.collectionVariables.get('productId'));",
+              "    pm.expect(body.productId).to.equal(pm.variables.get('productId'));",
               "});"
             ]
           }
@@ -128,12 +160,22 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements", "{{movementId}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements",
+            "{{movementId}}"
+          ]
         }
       },
       "response": []
@@ -151,7 +193,7 @@
               "pm.test('Both product movements are returned', () => {",
               "    const body = pm.response.json();",
               "    pm.expect(body).to.be.an('array').with.lengthOf(2);",
-              "    body.forEach(movement => pm.expect(movement.productId).to.equal(pm.collectionVariables.get('productId')));",
+              "    body.forEach(movement => pm.expect(movement.productId).to.equal(pm.variables.get('productId')));",
               "});"
             ]
           }
@@ -160,16 +202,34 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&productType=BANK_ACCOUNT&limit=20",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements"
+          ],
           "query": [
-            { "key": "productId", "value": "{{productId}}" },
-            { "key": "productType", "value": "BANK_ACCOUNT" },
-            { "key": "limit", "value": "20" }
+            {
+              "key": "productId",
+              "value": "{{productId}}"
+            },
+            {
+              "key": "productType",
+              "value": "BANK_ACCOUNT"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
           ]
         }
       },
@@ -199,15 +259,30 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&limit=1",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements"
+          ],
           "query": [
-            { "key": "productId", "value": "{{productId}}" },
-            { "key": "limit", "value": "1" }
+            {
+              "key": "productId",
+              "value": "{{productId}}"
+            },
+            {
+              "key": "limit",
+              "value": "1"
+            }
           ]
         }
       },
@@ -234,16 +309,34 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&limit=1&cursor={{nextCursor}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements"
+          ],
           "query": [
-            { "key": "productId", "value": "{{productId}}" },
-            { "key": "limit", "value": "1" },
-            { "key": "cursor", "value": "{{nextCursor}}" }
+            {
+              "key": "productId",
+              "value": "{{productId}}"
+            },
+            {
+              "key": "limit",
+              "value": "1"
+            },
+            {
+              "key": "cursor",
+              "value": "{{nextCursor}}"
+            }
           ]
         }
       },
@@ -274,18 +367,35 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"movementType\": \"PAYMENT\",\n  \"amount\": 10.00,\n  \"currency\": \"USD\",\n  \"description\": \"Updated payment\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements", "{{movementId}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements",
+            "{{movementId}}"
+          ]
         }
       },
       "response": []
@@ -312,18 +422,34 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"productType\": \"BANK_ACCOUNT\",\n  \"movementType\": \"DEPOSIT\",\n  \"amount\": 0,\n  \"currency\": \"PEN\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements"
+          ]
         }
       },
       "response": []
@@ -349,13 +475,27 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements?limit=0",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"],
-          "query": [{ "key": "limit", "value": "0" }]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "0"
+            }
+          ]
         }
       },
       "response": []
@@ -381,15 +521,30 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements?limit=10&cursor=bad-cursor",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements"
+          ],
           "query": [
-            { "key": "limit", "value": "10" },
-            { "key": "cursor", "value": "bad-cursor" }
+            {
+              "key": "limit",
+              "value": "10"
+            },
+            {
+              "key": "cursor",
+              "value": "bad-cursor"
+            }
           ]
         }
       },
@@ -416,15 +571,30 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements?from=2025-02-01T00:00:00Z&to=2025-01-01T00:00:00Z",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements"
+          ],
           "query": [
-            { "key": "from", "value": "2025-02-01T00:00:00Z" },
-            { "key": "to", "value": "2025-01-01T00:00:00Z" }
+            {
+              "key": "from",
+              "value": "2025-02-01T00:00:00Z"
+            },
+            {
+              "key": "to",
+              "value": "2025-01-01T00:00:00Z"
+            }
           ]
         }
       },
@@ -447,12 +617,22 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements", "{{movementId}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements",
+            "{{movementId}}"
+          ]
         }
       },
       "response": []
@@ -479,12 +659,22 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements", "{{movementId}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements",
+            "{{movementId}}"
+          ]
         }
       },
       "response": []
@@ -506,12 +696,22 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements/{{secondMovementId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements", "{{secondMovementId}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements",
+            "{{secondMovementId}}"
+          ]
         }
       },
       "response": []
@@ -537,23 +737,57 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "X-Correlation-ID", "value": "{{correlationId}}" }
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/movements/{{movementId}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "movements", "{{movementId}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements",
+            "{{movementId}}"
+          ]
         }
       },
       "response": []
     }
   ],
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8084", "type": "string" },
-    { "key": "correlationId", "value": "", "type": "string" },
-    { "key": "productId", "value": "", "type": "string" },
-    { "key": "movementId", "value": "", "type": "string" },
-    { "key": "secondMovementId", "value": "", "type": "string" },
-    { "key": "nextCursor", "value": "", "type": "string" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8084",
+      "type": "string"
+    },
+    {
+      "key": "correlationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "movementId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "secondMovementId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "nextCursor",
+      "value": "",
+      "type": "string"
+    }
   ]
 }

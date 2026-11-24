@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.adapter.rxjava.RxJava3Adapter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -46,7 +47,8 @@ public class MovementController implements MovementsApi {
     @Override
     public Mono<ResponseEntity<Movement>> createMovement(Mono<MovementRequest> request,
                                                           ServerWebExchange exchange) {
-        return request.flatMap(body -> createMovement.create(mapper.toCreateCommand(body)))
+        return request.flatMap(body -> RxJava3Adapter.singleToMono(
+                        createMovement.create(mapper.toCreateCommand(body))))
                 .map(mapper::toResponse)
                 .map(movement -> ResponseEntity.created(URI.create(
                         "/api/v1/movements/" + movement.getId())).body(movement));
@@ -55,7 +57,8 @@ public class MovementController implements MovementsApi {
     /** Deletes an existing movement and returns no content. */
     @Override
     public Mono<ResponseEntity<Void>> deleteMovement(String movementId, ServerWebExchange exchange) {
-        return deleteMovement.delete(movementId).thenReturn(ResponseEntity.noContent().build());
+        return RxJava3Adapter.completableToMono(deleteMovement.delete(movementId))
+                .thenReturn(ResponseEntity.noContent().build());
     }
 
     /** Returns the requested movement history page and optional next-page header. */
@@ -67,7 +70,7 @@ public class MovementController implements MovementsApi {
                 : com.pivot.banking.transaction.domain.ProductType.valueOf(productType.name());
         var filter = new MovementFilter(productId, type,
                 from == null ? null : from.toInstant(), to == null ? null : to.toInstant());
-        return getMovements.findAll(filter, limit, cursor)
+        return RxJava3Adapter.singleToMono(getMovements.findAll(filter, limit, cursor))
                 .map(page -> {
                     var response = ResponseEntity.ok();
                     if (page.nextCursor() != null) {
@@ -80,14 +83,16 @@ public class MovementController implements MovementsApi {
     /** Returns a movement by its MongoDB document identifier. */
     @Override
     public Mono<ResponseEntity<Movement>> findMovementById(String movementId, ServerWebExchange exchange) {
-        return getMovements.findById(movementId).map(mapper::toResponse).map(ResponseEntity::ok);
+        return RxJava3Adapter.singleToMono(getMovements.findById(movementId))
+                .map(mapper::toResponse).map(ResponseEntity::ok);
     }
 
     /** Replaces editable movement fields. */
     @Override
     public Mono<ResponseEntity<Movement>> updateMovement(String movementId,
             Mono<MovementUpdateRequest> request, ServerWebExchange exchange) {
-        return request.flatMap(body -> updateMovement.update(movementId, mapper.toUpdateCommand(body)))
+        return request.flatMap(body -> RxJava3Adapter.singleToMono(
+                        updateMovement.update(movementId, mapper.toUpdateCommand(body))))
                 .map(mapper::toResponse)
                 .map(ResponseEntity::ok);
     }

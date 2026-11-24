@@ -4,57 +4,130 @@ title transaction-service - Diagrama de secuencia
 skinparam shadowing false
 skinparam sequenceMessageAlign center
 
-actor "Cliente\n(Postman)" as User
-participant "account-service /\ncredit-service" as Caller
-participant "MovementController\n(inbound adapter)" as Controller
-participant "MovementCommandService\n/ MovementQueryService" as Service
-participant "MovementRepositoryPort\n+ MongoAdapter" as Repo
+actor "Cliente / servicio\n(Postman, account-service o credit-service)" as User
+participant "MovementController\n(adaptador WebFlux)" as Controller
+participant "MovementApplicationService\n(casos de uso, RxJava 3)" as Service
+participant "MovementRepositoryPort + adaptador MongoDB\n(puerto RxJava; conversión Reactor en el adaptador)" as Repo
 database "MongoDB\nmovement_db" as DB
+participant "CorrelationIdWebFilter\n(WebFilter, prioridad máxima)" as Correlation
 
-== 1. Registrar movimiento (POST /api/v1/movements) - interno ==
-Caller -> Controller : POST /movements\n{productId, productType, movementType, amount, currency}
-Controller -> Service : register(command)
-Service -> Repo : save(movement)
-Repo -> DB : insert movement
-DB --> Repo : documento creado
-Repo --> Service : Movement
-Service --> Controller : RegisterMovementResult (interno)
-Controller --> Caller : 201 Created + Movement
+note over Controller, Repo
+  WebFlux conserva Mono/Flux en el límite HTTP.
+  El controlador convierte explícitamente entre Reactor y RxJava
+  con RxJava3Adapter; el adaptador Mongo hace lo mismo con
+  ReactiveMongoRepository y ReactiveMongoTemplate.
+end note
 
-== 2. Consultar movimientos de un producto (GET /api/v1/movements) ==
-User -> Controller : GET /movements?productId={id}&productType=BANK_ACCOUNT\n&limit=50&cursor=...
-Controller -> Service : findAll(filter, cursorPageQuery)
-Service -> Repo : findAll(filter, cursorPageQuery)
-Repo -> DB : find({productId}) sort createdAt desc, id desc\nlimit N (cursor = createdAt + id)
-DB --> Repo : documentos
-Repo --> Service : Flowable<Movement>
-Service -> Service : arma MovementPage\n(pide limit+1 para calcular nextCursor)
+note over User, Correlation
+  El filtro reutiliza el X-Correlation-ID entrante si no está vacío;
+  si falta o está en blanco, genera un UUID. Todas las respuestas incluyen
+  X-Correlation-ID: {id} con el mismo valor recibido o generado.
+  account-service y credit-service envían el ID propagado por sus WebClient.
+end note
+
+== 1. Registrar movimiento (POST /api/v1/movements, interno) ==
+User -> Controller : POST /api/v1/movements\nMovementRequest\nX-Correlation-ID: {id}
+Controller -> Service : create(command): Single<Movement>
+Service -> Service : crear Movement\n(currency omitida -> PEN)
+Service -> Repo : save(movement): Single<Movement>
+Repo -> DB : repository.save(): Mono<MovementEntity>
+DB --> Repo : Mono<MovementEntity> guardado
+Repo --> Service : monoToSingle(...): Single<Movement>
+Service --> Controller : Single<Movement>
+Controller -> Controller : RxJava3Adapter.singleToMono(...)
+Controller --> User : 201 Created + Location\nMovement\nX-Correlation-ID: {id}
+note right of User
+  Invocado por account-service o credit-service.
+  El cuerpo del contrato exige productId, productType,
+  movementType y amount.
+end note
+note over Controller, User
+  Solicitud inválida: 400 Bad Request.
+  Fallo al registrar: 503 Service Unavailable.
+end note
+
+== 2. Consultar movimientos (GET /api/v1/movements) ==
+User -> Controller : GET /api/v1/movements\n?productId&productType&from&to&limit&cursor
+Controller -> Service : findAll(filter, limit, cursor)
+Service -> Service : validar limit (1..200), fechas\ny decodificar cursor opaco
+Service -> Repo : findPage(filter, cursor, limit + 1): Flowable<Movement>
+Repo -> DB : find(query): Flux<MovementEntity>\nORDER BY createdAt DESC, id DESC\nLIMIT limit + 1
+DB --> Repo : Flux<MovementEntity>
+Repo --> Service : fluxToFlowable(...): Flowable<Movement>
+Service -> Service : Flowable.toList(): Single<List<Movement>>;\nconservar hasta limit y crear cursor
 Service --> Controller : Single<MovementPage>
-Controller --> User : 200 OK + cabecera X-Next-Cursor\n(application/json o application/x-ndjson)
+Controller -> Controller : RxJava3Adapter.singleToMono(...)\ny Flux.fromIterable(page.movements())
+Controller --> User : 200 OK + Movement[]\nJSON o NDJSON\nX-Correlation-ID: {id}
+opt hay página siguiente
+  Controller --> User : cabecera X-Next-Cursor\n+ X-Correlation-ID: {id}
+end
+note over User, Service
+  GET admite productId, productType, from, to, limit y cursor.
+  X-Next-Cursor se omite cuando no hay más resultados.
+  Parámetros inválidos: 400 application/problem+json.
+end note
 
-== 3. Administrar movimientos (PUT / DELETE /api/v1/movements/{id}) - interno ==
-User -> Controller : PUT o DELETE /movements/{id}
-Controller -> Service : update(id, command) / delete(id)
-Service -> Repo : findById(id)
-Repo -> DB : find({_id})
-DB --> Repo : documento o vacio
-Repo --> Service : Maybe<Movement>
+== 3. Consultar movimiento (GET /api/v1/movements/{movementId}) ==
+User -> Controller : GET /api/v1/movements/{movementId}
+Controller -> Service : findById(movementId)
+Service -> Repo : findById(movementId): Maybe<Movement>
+Repo -> DB : repository.findById(): Mono<MovementEntity>
+DB --> Repo : Mono<MovementEntity> o vacío
+Repo --> Service : monoToMaybe(...): Maybe<Movement>
 alt no existe
-  Service --> Controller : ResourceNotFoundException
-  Controller --> User : 404 Not Found
+  Service -> Service : Maybe.switchIfEmpty(Single.error(...))
+  Service --> Controller : MovementNotFoundException
+  Controller -> Controller : RxJava3Adapter.singleToMono(...)\npropaga el error
+  Controller --> User : 404 Not Found\napplication/problem+json\nX-Correlation-ID: {id}
 else existe
-  Service -> Repo : save(movement) / deleteById(id)
-  Repo -> DB : replace / delete
-  DB --> Repo : OK
-  Service --> Controller : Single<Movement> / Completable
-  Controller --> User : 200 OK / 204 No Content
+  Service --> Controller : Single<Movement>
+  Controller -> Controller : RxJava3Adapter.singleToMono(...)
+  Controller --> User : 200 OK + Movement\nX-Correlation-ID: {id}
 end
 
-note over User, DB
-  RegisterMovementResult es interno al caso de uso.
-  El controlador devuelve su campo Movement, no el envoltorio.
-  Las rutas de escritura son internas/administrativas.
-  El contador mensual de movimientos vive en account-service.
+== 4. Actualizar movimiento (PUT /api/v1/movements/{movementId}, administrativo) ==
+User -> Controller : PUT /api/v1/movements/{movementId}\nMovementUpdateRequest
+Controller -> Service : update(movementId, command): Single<Movement>
+Service -> Repo : findById(movementId): Maybe<Movement>
+Repo -> DB : repository.findById(): Mono<MovementEntity>
+DB --> Repo : Mono<MovementEntity> o vacío
+Repo --> Service : monoToMaybe(...): Maybe<Movement>
+alt no existe
+  Service --> Controller : MovementNotFoundException
+  Controller -> Controller : RxJava3Adapter.singleToMono(...)\npropaga el error
+  Controller --> User : 404 Not Found\nX-Correlation-ID: {id}
+else existe
+  Service -> Service : actualizar tipo, importe,\nmoneda y descripción;\nconservar producto y createdAt
+  Service -> Repo : save(movement actualizado): Single<Movement>
+  Repo -> DB : repository.save(): Mono<MovementEntity>
+  DB --> Repo : Mono<MovementEntity> actualizado
+  Repo --> Service : monoToSingle(...): Single<Movement>
+  Service --> Controller : Single<Movement>
+  Controller -> Controller : RxJava3Adapter.singleToMono(...)
+  Controller --> User : 200 OK + Movement\nX-Correlation-ID: {id}
+end
+note over Controller, User
+  Solicitud inválida: 400 Bad Request.
 end note
+
+== 5. Eliminar movimiento (DELETE /api/v1/movements/{movementId}, administrativo) ==
+User -> Controller : DELETE /api/v1/movements/{movementId}
+Controller -> Service : delete(movementId): Completable
+Service -> Repo : findById(movementId): Maybe<Movement>
+Repo -> DB : repository.findById(): Mono<MovementEntity>
+DB --> Repo : Mono<MovementEntity> o vacío
+Repo --> Service : monoToMaybe(...): Maybe<Movement>
+alt no existe
+  Service --> Controller : MovementNotFoundException
+  Controller -> Controller : RxJava3Adapter.completableToMono(...)\npropaga el error
+  Controller --> User : 404 Not Found\nX-Correlation-ID: {id}
+else existe
+  Service -> Repo : deleteById(movementId): Completable
+  Repo -> DB : repository.deleteById(): Mono<Void>
+  DB --> Repo : Mono<Void> completado
+  Repo --> Service : monoToCompletable(...): Completable
+  Controller -> Controller : RxJava3Adapter.completableToMono(...)
+  Controller --> User : 204 No Content\nX-Correlation-ID: {id}
+end
 
 @enduml

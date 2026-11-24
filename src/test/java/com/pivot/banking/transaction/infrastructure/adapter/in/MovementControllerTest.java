@@ -12,6 +12,8 @@ import com.pivot.banking.transaction.domain.MovementFilter;
 import com.pivot.banking.transaction.domain.MovementPage;
 import com.pivot.banking.transaction.domain.MovementType;
 import com.pivot.banking.transaction.domain.ProductType;
+import io.reactivex.rxjava3.core.Completable;
+import io.reactivex.rxjava3.core.Single;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,8 +24,6 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import reactor.core.publisher.Mono;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -67,7 +67,7 @@ class MovementControllerTest {
         // Arrange
         UUID productId = UUID.randomUUID();
         Movement created = movement("id-1", productId, "25.50");
-        when(createMovement.create(any(CreateMovementCommand.class))).thenReturn(Mono.just(created));
+        when(createMovement.create(any(CreateMovementCommand.class))).thenReturn(Single.just(created));
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.post()
@@ -111,7 +111,7 @@ class MovementControllerTest {
     void shouldDelegateFindByIdAndReturnOkMovement() {
         // Arrange
         Movement existing = movement("id-1", UUID.randomUUID(), "10.00");
-        when(getMovements.findById("id-1")).thenReturn(Mono.just(existing));
+        when(getMovements.findById("id-1")).thenReturn(Single.just(existing));
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.get()
@@ -133,7 +133,7 @@ class MovementControllerTest {
     void shouldReturnNotFoundWhenFindByIdDoesNotExist() {
         // Arrange
         when(getMovements.findById("missing"))
-                .thenReturn(Mono.error(new MovementNotFoundException("missing")));
+                .thenReturn(Single.error(new MovementNotFoundException("missing")));
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.get()
@@ -155,7 +155,7 @@ class MovementControllerTest {
         Movement first = movement("id-1", UUID.randomUUID(), "1.00");
         MovementPage page = new MovementPage(List.of(first), null);
         when(getMovements.findAll(any(MovementFilter.class), eq(50), isNull()))
-                .thenReturn(Mono.just(page));
+                .thenReturn(Single.just(page));
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.get()
@@ -178,7 +178,7 @@ class MovementControllerTest {
         Movement first = movement("id-1", UUID.randomUUID(), "1.00");
         MovementPage page = new MovementPage(List.of(first), "next-cursor");
         when(getMovements.findAll(any(MovementFilter.class), eq(10), eq("cursor-token")))
-                .thenReturn(Mono.just(page));
+                .thenReturn(Single.just(page));
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.get()
@@ -200,7 +200,7 @@ class MovementControllerTest {
         UUID productId = UUID.randomUUID();
         MovementPage page = new MovementPage(List.of(), null);
         when(getMovements.findAll(any(MovementFilter.class), eq(10), isNull()))
-                .thenReturn(Mono.just(page));
+                .thenReturn(Single.just(page));
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.get()
@@ -223,7 +223,7 @@ class MovementControllerTest {
         // Arrange
         MovementPage page = new MovementPage(List.of(), null);
         when(getMovements.findAll(any(MovementFilter.class), eq(50), isNull()))
-                .thenReturn(Mono.just(page));
+                .thenReturn(Single.just(page));
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.get()
@@ -240,7 +240,7 @@ class MovementControllerTest {
     void shouldPropagateInvalidRequestFromUseCase() {
         // Arrange
         when(getMovements.findAll(any(MovementFilter.class), eq(0), isNull()))
-                .thenReturn(Mono.error(new IllegalArgumentException("limit must be between 1 and 200")));
+                .thenReturn(Single.error(new IllegalArgumentException("limit must be between 1 and 200")));
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.get()
@@ -260,7 +260,7 @@ class MovementControllerTest {
         Movement updated = movement("id-1", UUID.randomUUID(), "10.00")
                 .update(MovementType.PAYMENT, new BigDecimal("10.00"), "USD", "Updated");
         when(updateMovement.update(eq("id-1"), any(UpdateMovementCommand.class)))
-                .thenReturn(Mono.just(updated));
+                .thenReturn(Single.just(updated));
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.put()
@@ -322,7 +322,7 @@ class MovementControllerTest {
     @Test
     void shouldDelegateDeleteAndReturnNoContent() {
         // Arrange
-        when(deleteMovement.delete("id-1")).thenReturn(Mono.empty());
+        when(deleteMovement.delete("id-1")).thenReturn(Completable.complete());
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.delete()
@@ -338,7 +338,7 @@ class MovementControllerTest {
     void shouldReturnNotFoundWhenDeleteMissingMovement() {
         // Arrange
         when(deleteMovement.delete("missing"))
-                .thenReturn(Mono.error(new MovementNotFoundException("missing")));
+                .thenReturn(Completable.error(new MovementNotFoundException("missing")));
 
         // Act
         WebTestClient.ResponseSpec response = webTestClient.delete()

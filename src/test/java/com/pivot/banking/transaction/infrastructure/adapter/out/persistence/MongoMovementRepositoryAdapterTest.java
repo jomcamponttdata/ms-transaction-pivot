@@ -5,6 +5,10 @@ import com.pivot.banking.transaction.domain.MovementCursor;
 import com.pivot.banking.transaction.domain.MovementFilter;
 import com.pivot.banking.transaction.domain.MovementType;
 import com.pivot.banking.transaction.domain.ProductType;
+import io.reactivex.rxjava3.core.Completable;
+import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.core.Maybe;
+import io.reactivex.rxjava3.core.Single;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -44,21 +48,19 @@ class MongoMovementRepositoryAdapterTest {
                 .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
 
         // Act
-        Mono<Movement> result = adapter.save(movement);
+        Single<Movement> result = adapter.save(movement);
 
         // Assert
-        StepVerifier.create(result)
-                .assertNext(saved -> {
-                    assertEquals("id-1", saved.id());
-                    assertEquals(movement.productId(), saved.productId());
-                    assertEquals(movement.productType(), saved.productType());
-                    assertEquals(movement.movementType(), saved.movementType());
-                    assertEquals(movement.amount(), saved.amount());
-                    assertEquals(movement.currency(), saved.currency());
-                    assertEquals(movement.description(), saved.description());
-                    assertEquals(movement.createdAt(), saved.createdAt());
-                })
-                .verifyComplete();
+        result.test()
+                .assertValue(saved -> "id-1".equals(saved.id())
+                        && movement.productId().equals(saved.productId())
+                        && movement.productType() == saved.productType()
+                        && movement.movementType() == saved.movementType()
+                        && movement.amount().equals(saved.amount())
+                        && movement.currency().equals(saved.currency())
+                        && movement.description().equals(saved.description())
+                        && movement.createdAt().equals(saved.createdAt()))
+                .assertComplete();
         verify(repository).save(any(MovementEntity.class));
     }
 
@@ -69,12 +71,10 @@ class MongoMovementRepositoryAdapterTest {
         when(repository.findById("id-1")).thenReturn(Mono.just(MovementEntity.fromDomain(movement)));
 
         // Act
-        Mono<Movement> result = adapter.findById("id-1");
+        Maybe<Movement> result = adapter.findById("id-1");
 
         // Assert
-        StepVerifier.create(result)
-                .assertNext(found -> assertEquals(movement, found))
-                .verifyComplete();
+        result.test().assertValue(movement).assertComplete();
         verify(repository).findById("id-1");
     }
 
@@ -84,10 +84,10 @@ class MongoMovementRepositoryAdapterTest {
         when(repository.findById("missing")).thenReturn(Mono.empty());
 
         // Act
-        Mono<Movement> result = adapter.findById("missing");
+        Maybe<Movement> result = adapter.findById("missing");
 
         // Assert
-        StepVerifier.create(result).verifyComplete();
+        result.test().assertNoValues().assertComplete();
         verify(repository).findById("missing");
     }
 
@@ -103,12 +103,10 @@ class MongoMovementRepositoryAdapterTest {
         when(template.find(any(Query.class), eq(MovementEntity.class))).thenReturn(Flux.just(entity));
 
         // Act
-        Flux<Movement> result = adapter.findPage(filter, cursor, 10);
+        Flowable<Movement> result = adapter.findPage(filter, cursor, 10);
 
         // Assert
-        StepVerifier.create(result)
-                .assertNext(found -> assertEquals(movement, found))
-                .verifyComplete();
+        result.test().assertValue(movement).assertComplete();
         verify(template).find(any(Query.class), eq(MovementEntity.class));
     }
 
@@ -119,10 +117,10 @@ class MongoMovementRepositoryAdapterTest {
         when(template.find(any(Query.class), eq(MovementEntity.class))).thenReturn(Flux.empty());
 
         // Act
-        Flux<Movement> result = adapter.findPage(filter, null, 20);
+        Flowable<Movement> result = adapter.findPage(filter, null, 20);
 
         // Assert
-        StepVerifier.create(result).verifyComplete();
+        result.test().assertNoValues().assertComplete();
         verify(template).find(any(Query.class), eq(MovementEntity.class));
     }
 
@@ -132,10 +130,10 @@ class MongoMovementRepositoryAdapterTest {
         when(repository.deleteById("id-1")).thenReturn(Mono.empty());
 
         // Act
-        Mono<Void> result = adapter.deleteById("id-1");
+        Completable result = adapter.deleteById("id-1");
 
         // Assert
-        StepVerifier.create(result).verifyComplete();
+        result.test().assertComplete();
         verify(repository).deleteById("id-1");
     }
 

@@ -9,15 +9,15 @@ import com.pivot.banking.transaction.domain.MovementCursor;
 import com.pivot.banking.transaction.domain.MovementFilter;
 import com.pivot.banking.transaction.domain.MovementType;
 import com.pivot.banking.transaction.domain.ProductType;
+import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.core.Maybe;
+import io.reactivex.rxjava3.core.Single;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -51,20 +51,18 @@ class MovementApplicationServiceTest {
         // Arrange
         var command = new CreateMovementCommand(UUID.randomUUID(), ProductType.BANK_ACCOUNT,
                 MovementType.DEPOSIT, new BigDecimal("25.50"), null, "Cash deposit");
-        when(repository.save(any(Movement.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        when(repository.save(any(Movement.class))).thenAnswer(invocation -> Single.just(invocation.getArgument(0)));
 
         // Act
         var result = service.create(command);
 
         // Assert
-        StepVerifier.create(result)
-                .assertNext(movement -> {
-                    assertNotNull(movement.id());
-                    assertEquals("PEN", movement.currency());
-                    assertEquals(command.productId(), movement.productId());
-                    assertNotNull(movement.createdAt());
-                })
-                .verifyComplete();
+        result.test()
+                .assertValue(movement -> movement.id() != null
+                        && "PEN".equals(movement.currency())
+                        && command.productId().equals(movement.productId())
+                        && movement.createdAt() != null)
+                .assertComplete();
     }
 
     @Test
@@ -74,29 +72,25 @@ class MovementApplicationServiceTest {
         var first = movement("first", "2025-01-03T10:00:00Z");
         var second = movement("second", "2025-01-02T10:00:00Z");
         var extra = movement("extra", "2025-01-01T10:00:00Z");
-        when(repository.findPage(filter, null, 3)).thenReturn(Flux.just(first, second, extra));
+        when(repository.findPage(filter, null, 3)).thenReturn(Flowable.just(first, second, extra));
 
         // Act
         var firstPage = service.findAll(filter, 2, null);
 
         // Assert
-        StepVerifier.create(firstPage)
-                .assertNext(page -> {
-                    assertEquals(List.of(first, second), page.movements());
-                    assertNotNull(page.nextCursor());
-                })
-                .verifyComplete();
+        firstPage.test()
+                .assertValue(page -> page.movements().equals(List.of(first, second))
+                        && page.nextCursor() != null)
+                .assertComplete();
 
         var cursorCaptor = ArgumentCaptor.forClass(MovementCursor.class);
         when(repository.findPage(eq(filter), cursorCaptor.capture(), eq(3)))
-                .thenReturn(Flux.just(extra));
+                .thenReturn(Flowable.just(extra));
         // Act
         var secondPage = service.findAll(filter, 2, "MjAyNS0wMS0wMlQxMDowMDowMFoKc2Vjb25k");
 
         // Assert
-        StepVerifier.create(secondPage)
-                .assertNext(page -> assertNull(page.nextCursor()))
-                .verifyComplete();
+        secondPage.test().assertValue(page -> page.nextCursor() == null).assertComplete();
         assertEquals(second.id(), cursorCaptor.getValue().id());
         assertEquals(second.createdAt(), cursorCaptor.getValue().createdAt());
     }
@@ -111,12 +105,8 @@ class MovementApplicationServiceTest {
         var invalidCursor = service.findAll(filter, 10, "bad-cursor");
 
         // Assert
-        StepVerifier.create(oversizedPage)
-                .expectError(IllegalArgumentException.class)
-                .verify();
-        StepVerifier.create(invalidCursor)
-                .expectError(IllegalArgumentException.class)
-                .verify();
+        oversizedPage.test().assertError(IllegalArgumentException.class);
+        invalidCursor.test().assertError(IllegalArgumentException.class);
 
         verify(repository, never()).findPage(any(), any(), any(Integer.class));
     }
@@ -131,9 +121,7 @@ class MovementApplicationServiceTest {
         var result = service.findAll(filter, 10, null);
 
         // Assert
-        StepVerifier.create(result)
-                .expectError(IllegalArgumentException.class)
-                .verify();
+        result.test().assertError(IllegalArgumentException.class);
 
         verify(repository, never()).findPage(any(), any(), any(Integer.class));
     }
@@ -144,36 +132,31 @@ class MovementApplicationServiceTest {
         var existing = movement("movement-1", "2025-01-01T00:00:00Z");
         var command = new UpdateMovementCommand(MovementType.PAYMENT, new BigDecimal("10.00"),
                 "USD", "Updated");
-        when(repository.findById(existing.id())).thenReturn(Mono.just(existing));
-        when(repository.save(any(Movement.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        when(repository.findById(existing.id())).thenReturn(Maybe.just(existing));
+        when(repository.save(any(Movement.class))).thenAnswer(invocation -> Single.just(invocation.getArgument(0)));
 
         // Act
         var result = service.update(existing.id(), command);
 
         // Assert
-        StepVerifier.create(result)
-                .assertNext(updated -> {
-                    assertEquals(existing.productId(), updated.productId());
-                    assertEquals(existing.productType(), updated.productType());
-                    assertEquals(existing.createdAt(), updated.createdAt());
-                    assertEquals(MovementType.PAYMENT, updated.movementType());
-                    assertEquals("USD", updated.currency());
-                })
-                .verifyComplete();
+        result.test().assertValue(updated -> existing.productId().equals(updated.productId())
+                        && existing.productType() == updated.productType()
+                        && existing.createdAt().equals(updated.createdAt())
+                        && MovementType.PAYMENT == updated.movementType()
+                        && "USD".equals(updated.currency()))
+                .assertComplete();
     }
 
     @Test
     void deleteReturnsNotFoundForMissingMovement() {
         // Arrange
-        when(repository.findById("missing")).thenReturn(Mono.empty());
+        when(repository.findById("missing")).thenReturn(Maybe.empty());
 
         // Act
         var result = service.delete("missing");
 
         // Assert
-        StepVerifier.create(result)
-                .expectError(MovementNotFoundException.class)
-                .verify();
+        result.test().assertError(MovementNotFoundException.class);
 
         verify(repository, never()).deleteById("missing");
     }
@@ -183,15 +166,13 @@ class MovementApplicationServiceTest {
         // Arrange
         var command = new CreateMovementCommand(UUID.randomUUID(), ProductType.CREDIT_CARD,
                 MovementType.CHARGE, new BigDecimal("35.00"), "USD", "Card charge");
-        when(repository.save(any(Movement.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        when(repository.save(any(Movement.class))).thenAnswer(invocation -> Single.just(invocation.getArgument(0)));
 
         // Act
         var result = service.create(command);
 
         // Assert
-        StepVerifier.create(result)
-                .assertNext(movement -> assertEquals("USD", movement.currency()))
-                .verifyComplete();
+        result.test().assertValue(movement -> "USD".equals(movement.currency())).assertComplete();
         verify(repository).save(any(Movement.class));
     }
 
@@ -204,9 +185,7 @@ class MovementApplicationServiceTest {
         var result = service.findAll(filter, 0, null);
 
         // Assert
-        StepVerifier.create(result)
-                .expectError(IllegalArgumentException.class)
-                .verify();
+        result.test().assertError(IllegalArgumentException.class);
         verify(repository, never()).findPage(any(), any(), any(Integer.class));
     }
 
@@ -216,20 +195,16 @@ class MovementApplicationServiceTest {
         var closedRange = new MovementFilter(null, null, Instant.parse("2025-01-01T00:00:00Z"),
                 Instant.parse("2025-01-31T00:00:00Z"));
         var openRange = new MovementFilter(null, null, Instant.parse("2025-01-01T00:00:00Z"), null);
-        when(repository.findPage(closedRange, null, 11)).thenReturn(Flux.empty());
-        when(repository.findPage(openRange, null, 11)).thenReturn(Flux.empty());
+        when(repository.findPage(closedRange, null, 11)).thenReturn(Flowable.empty());
+        when(repository.findPage(openRange, null, 11)).thenReturn(Flowable.empty());
 
         // Act
         var closedResult = service.findAll(closedRange, 10, null);
         var openResult = service.findAll(openRange, 10, null);
 
         // Assert
-        StepVerifier.create(closedResult)
-                .assertNext(page -> assertNull(page.nextCursor()))
-                .verifyComplete();
-        StepVerifier.create(openResult)
-                .assertNext(page -> assertNull(page.nextCursor()))
-                .verifyComplete();
+        closedResult.test().assertValue(page -> page.nextCursor() == null).assertComplete();
+        openResult.test().assertValue(page -> page.nextCursor() == null).assertComplete();
         verify(repository).findPage(closedRange, null, 11);
         verify(repository).findPage(openRange, null, 11);
     }
@@ -238,15 +213,13 @@ class MovementApplicationServiceTest {
     void findAllTreatsABlankCursorAsTheFirstPage() {
         // Arrange
         var filter = new MovementFilter(null, null, null, null);
-        when(repository.findPage(filter, null, 11)).thenReturn(Flux.empty());
+        when(repository.findPage(filter, null, 11)).thenReturn(Flowable.empty());
 
         // Act
         var result = service.findAll(filter, 10, " ");
 
         // Assert
-        StepVerifier.create(result)
-                .assertNext(page -> assertNull(page.nextCursor()))
-                .verifyComplete();
+        result.test().assertValue(page -> page.nextCursor() == null).assertComplete();
         verify(repository).findPage(filter, null, 11);
     }
 
@@ -264,9 +237,9 @@ class MovementApplicationServiceTest {
         var timestampResult = service.findAll(filter, 10, invalidTimestamp);
 
         // Assert
-        StepVerifier.create(separatorResult).expectError(IllegalArgumentException.class).verify();
-        StepVerifier.create(missingIdResult).expectError(IllegalArgumentException.class).verify();
-        StepVerifier.create(timestampResult).expectError(IllegalArgumentException.class).verify();
+        separatorResult.test().assertError(IllegalArgumentException.class);
+        missingIdResult.test().assertError(IllegalArgumentException.class);
+        timestampResult.test().assertError(IllegalArgumentException.class);
         verify(repository, never()).findPage(any(), any(), any(Integer.class));
     }
 
@@ -274,14 +247,14 @@ class MovementApplicationServiceTest {
     void deleteRemovesAnExistingMovement() {
         // Arrange
         var existing = movement("movement-1", "2025-01-01T00:00:00Z");
-        when(repository.findById(existing.id())).thenReturn(Mono.just(existing));
-        when(repository.deleteById(existing.id())).thenReturn(Mono.empty());
+        when(repository.findById(existing.id())).thenReturn(Maybe.just(existing));
+        when(repository.deleteById(existing.id())).thenReturn(io.reactivex.rxjava3.core.Completable.complete());
 
         // Act
         var result = service.delete(existing.id());
 
         // Assert
-        StepVerifier.create(result).verifyComplete();
+        result.test().assertComplete();
         verify(repository).deleteById(existing.id());
     }
 
