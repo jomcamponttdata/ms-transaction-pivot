@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "51f73cbb-5a44-4ee3-8d8c-ebdc4d4242b4",
     "name": "ms-transaction - Part I",
-    "description": "Executable CRUD, cursor pagination, validation and error tests for transaction-service. Run the requests in order with a running MongoDB instance and transaction-service on port 8084.",
+    "description": "Executable CRUD, cursor pagination, validation and error tests for transaction-service. Run the requests in order with a running MongoDB instance and transaction-service on port 8084. The collection verifies that every response echoes its request X-Correlation-ID.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -16,6 +16,21 @@
           "if (!pm.variables.get('productId')) {",
           "    pm.collectionVariables.set('productId', pm.variables.replaceIn('{{$guid}}'));",
           "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [
+          "pm.test('Response echoes the request X-Correlation-ID', () => {",
+          "    const sent = pm.variables.get('correlationId');",
+          "    const received = pm.response.headers.get('X-Correlation-ID');",
+          "    pm.expect(received).to.be.a('string').and.not.empty;",
+          "    pm.expect(received).to.equal(sent);",
+          "});"
         ]
       }
     }
