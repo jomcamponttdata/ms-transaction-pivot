@@ -1,0 +1,129 @@
+{
+  "info": {
+    "_postman_id": "025fbb64-505a-4c0c-b6e4-555df5201522",
+    "name": "ms-transaction - Part II",
+    "description": "Part II verification: general product report and latest 10 credit-card movements.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - Generate product report in date range",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Report generated', () => pm.response.to.have.status(200));",
+              "const b=pm.response.json(); pm.test('Report has movements and summary', () => { pm.expect(b.movements).to.be.an('array'); pm.expect(b.summary).to.be.an('array'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/reports/products",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "reports",
+            "products"
+          ],
+          "query": [
+            {
+              "key": "productId",
+              "value": "{{vipSavingsId}}"
+            },
+            {
+              "key": "productType",
+              "value": "BANK_ACCOUNT"
+            },
+            {
+              "key": "from",
+              "value": "2020-01-01T00:00:00Z"
+            },
+            {
+              "key": "to",
+              "value": "2030-01-01T00:00:00Z"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "02 - Latest 10 credit-card movements",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Card history retrieved', () => pm.response.to.have.status(200));",
+              "pm.test('At most 10 movements', () => pm.expect(pm.response.json().length).to.be.at.most(10));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/movements",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "movements"
+          ],
+          "query": [
+            {
+              "key": "productId",
+              "value": "{{vipCardId}}"
+            },
+            {
+              "key": "productType",
+              "value": "CREDIT_CARD"
+            },
+            {
+              "key": "limit",
+              "value": 10
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8184"
+    },
+    {
+      "key": "vipSavingsId",
+      "value": ""
+    },
+    {
+      "key": "vipCardId",
+      "value": ""
+    }
+  ]
+}

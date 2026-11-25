@@ -163,6 +163,51 @@ paths:
           description: Movement deleted
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/reports/products:
+    get:
+      tags: [Movements]
+      operationId: generateProductReport
+      summary: Generate a report of movements for a banking product
+      description: |
+        Returns the matching movements together with a summary grouped by movement type and currency.
+        The movements are read from the same history query used by `GET /api/v1/movements`, with the
+        same optional filters. The report is a bounded snapshot: at most the first 200 matching
+        movements are read, which is the maximum page size documented for that query.
+      parameters:
+        - name: productId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: productType
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProductType'
+        - name: from
+          in: query
+          required: false
+          description: Inclusive lower bound (ISO-8601 instant)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Inclusive upper bound (ISO-8601 instant)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Movement report with per-type and per-currency totals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductMovementReport'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
 components:
   parameters:
@@ -253,6 +298,34 @@ components:
         createdAt:
           type: string
           format: date-time
+    MovementTypeSummary:
+      type: object
+      description: Totals of the reported movements sharing a movement type and currency
+      required: [movementType, count, totalAmount, currency]
+      properties:
+        movementType:
+          $ref: '#/components/schemas/MovementType'
+        count:
+          type: integer
+          format: int64
+          minimum: 1
+        totalAmount:
+          $ref: '#/components/schemas/PositiveAmount'
+        currency:
+          $ref: '#/components/schemas/Currency'
+    ProductMovementReport:
+      type: object
+      description: Matching movements and their per-type and per-currency totals
+      required: [movements, summary]
+      properties:
+        movements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Movement'
+        summary:
+          type: array
+          items:
+            $ref: '#/components/schemas/MovementTypeSummary'
     Currency:
       type: string
       pattern: '^[A-Z]{3}$'
