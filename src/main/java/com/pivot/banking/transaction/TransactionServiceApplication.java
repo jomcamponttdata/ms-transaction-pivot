@@ -7,8 +7,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class TransactionServiceApplication {
 
-    /** Boots the Spring application context. */
-    public static void main(String[] args) {
-        SpringApplication.run(TransactionServiceApplication.class, args);
-    }
+  /** Boots the Spring application context. */
+  public static void main(String[] args) {
+    SpringApplication.run(TransactionServiceApplication.class, args);
+  }
 }
